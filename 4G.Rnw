@@ -1,0 +1,130 @@
+\documentclass[12pt]{article}
+\usepackage{tikz,pgfplots}
+\usepackage{calculator}
+\usepackage{colortbl}
+\usepackage{epsfig, epstopdf}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{bbm}
+\usepackage{alltt}
+\usepackage{color}
+\usepackage{graphicx}
+\usepackage{fancyvrb}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linktoc=all, linkcolor=blue}
+
+\usepackage{geometry}
+
+\geometry{
+a4paper,
+total={170mm,257mm},
+left=15mm,
+right=15mm,
+top=20mm}
+
+
+\title{Financial Econometrics - Home assignment 4}
+\author{Agafonov Nikolai, Kurennoi Ilia, \\*
+Panko Aliaksandr, Yakimchyk Nadzeya}
+\date{29 October 2018}
+
+\begin{document}
+\maketitle
+
+\section*{Exercise 4G}
+
+In this exercise we analyze a bivariate time series of average monthly European spot prices for black and white pepper in US dollars per ton from October 1973 to April 1996 with respect to the cointegraition relationship and provide the corresponding vector error correction model. 
+
+First, we plot the data of the spot prices for black and white pepper. Graphs of two times series look similar and probably share some common features.
+
+<<echo=FALSE, fig=TRUE, warning=FALSE, message=FALSE>>=
+library(AER)
+library(tseries)
+library(urca)
+library(vars)
+data("PepperPrice")
+
+plot(PepperPrice, plot.type = "single", col = 1:2, main="Time series of average monthly European spot prices for black
+and white pepper")     # series
+legend("topleft", c("black", "white"), bty = "n" , col = 1:2, lty = rep(1,2) )
+@
+
+\subsection*{Unit Root Test for Stationarity}
+
+Next we execute Augmented Dicky-Fuller unit root test, with the null hypothesis of non-stationarity:  
+
+<<echo=FALSE, fig=TRUE, warning=FALSE, message=FALSE>>=
+adf.test( PepperPrice[, "white"])
+adf.test( PepperPrice[, "black"])
+@
+
+The p-values of both tests are greater than 0.05 meaning that we cannot reject the H0 at 95\% significance level.
+
+Let's check if differencing helps:
+
+<<echo=FALSE, fig=TRUE, warning=FALSE, message=FALSE>>=
+adf.test(diff(PepperPrice[, "white"]))
+adf.test(diff(PepperPrice[, "black"]))
+@
+
+
+This time both p-values are smaller that 0.05, meaning that the time series differences are stationary at 95\% significance level, hence both time series are I(1).
+
+
+\subsection*{Test for Cointegration Relationship}
+
+In the next step we can proceed to the test for cointegration. For it we use the function ca.jo(), which conducts the Johansen-Procedure. 
+The methodology of this test begins with the VAR model of order p: 
+\begin{align*}
+y_t= \mu + \Phi_{1}y_{t-1} + ... + \Phi_{p}y_{t-p}+\epsilon_t
+\end{align*}
+
+Where $\mu$ is he vector-valued mean of the series, $\Phi_i$ is the coefficient matrix and $\epsilon_t$ is an (n*1) vector of innovations. 
+From this equation we can derive the Vector Error Correction Model by differencing series: 
+\begin{align*}
+\Delta x_t = \Pi x_{t-1} + \sum_{1}^{p-1} \Phi*_{i} \Delta x_{t-1}  + \epsilon_t
+\end{align*}
+where $\Pi$ is a coefficient matrix for the first lag and $\Phi_{i}^{*}$ are the matricies for the differenced lag. 
+
+The rank of the matrix $\Pi$ is given by r and the Johansen test sequentially tests whether this rank r is equal to zero, equal to one, through to r = n-1, where n is the number of thime series under test.
+The null hypotheses of r = 0 means that there is no cointegration at all. A rank $r > 0$ implies a cointegrating relationship between time series.
+
+
+Now we conduct the ca.jo() test to check, if there is some linear combination, which may produce a stationary process.
+
+<<echo=FALSE, fig=TRUE, warning=FALSE, message=FALSE>>=
+pepper_jo <- ca.jo(PepperPrice, ecdet = "none", type = "trace")
+summary(pepper_jo)
+@
+
+The first hypothesis, r=0, tests for the presence of cointegration. It is clear that since the test statistic exceeds the 5\% level of confidence $(21.88 > 19.96)$ that we have strong evidence to reject the null hypothesis of no cointegration.
+
+In the second test hypothesis of $r \le 1$ is not rejected at 5\% level of confidence (3.59 < 9.24). This means that there is 1 cointegrating relation.
+
+Now we find this cointegration and give the VECM.
+
+<<echo=FALSE, fig=TRUE, warning=FALSE, message=FALSE>>=
+library(tsDyn)
+vecm <- cajorls(pepper_jo, r = 1, reg.number = NULL)
+print(vecm)
+@
+
+VECM representation:
+
+		$$
+		\begin{pmatrix} \Delta B_{t} \\ \Delta W_{t} \end{pmatrix} = 
+		\begin{pmatrix} 1.31634 \\ 11.96555 \end{pmatrix} + 
+		\begin{pmatrix} -0.01747 \\ 0.14415 \end{pmatrix} *
+		\begin{pmatrix} B_{t-1} - 0.7419607*W_{t-1} \end{pmatrix} +
+		\begin{pmatrix} 0.36904 & 0.02519\\ 0.60702 & 0.03825 \end{pmatrix} 
+		\begin{pmatrix} \Delta B_{t-1} \\ \Delta W_{t-1} \end{pmatrix}+
+		\begin{pmatrix} \epsilon_{1, t} \\ \epsilon_{2, t} \end{pmatrix}
+		$$
+
+
+
+\end{document}
